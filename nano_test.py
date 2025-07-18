@@ -9,7 +9,7 @@ model = AutoModelForImageTextToText.from_pretrained(
     model_path, 
     torch_dtype="auto", 
     device_map="auto", 
-    attn_implementation="flash_attention_2"
+    #attn_implementation="flash_attention_2"
 )
 model.eval()
 tokenizer = AutoTokenizer.from_pretrained(model_path)

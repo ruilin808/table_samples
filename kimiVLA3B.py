@@ -13,7 +13,7 @@ model = AutoModelForCausalLM.from_pretrained(
     device_map="auto",
     trust_remote_code=True
 )
-processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
+processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True, local_files_only=True)
 
 def extract_thinking_and_summary(text: str, bot: str = "◁think▷", eot: str = "◁/think▷") -> tuple:
     if bot in text and eot not in text:
@@ -51,10 +51,9 @@ for i, image_path in enumerate(image_files, 1):
         ]}
     ]
     
-    # Apply chat template
+    # Apply chat template and process inputs
     text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    image_inputs, video_inputs = processor.process_vision_info(messages)
-    inputs = processor(text=[text], images=image_inputs, videos=video_inputs, padding=True, return_tensors="pt")
+    inputs = processor(text=[text], images=[image], padding=True, return_tensors="pt")
     inputs = inputs.to("cuda")
     
     # Generate

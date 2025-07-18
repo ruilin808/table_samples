@@ -1,21 +1,19 @@
 import os
 import glob
 from pathlib import Path
-from modelscope import AutoProcessor
-from vllm import LLM, SamplingParams
+from transformers import AutoModelForCausalLM, AutoProcessor
 from PIL import Image
+import torch
 
 # Initialize model and processor
 model_path = "moonshotai/Kimi-VL-A3B-Thinking-2506"
-llm = LLM(
+model = AutoModelForCausalLM.from_pretrained(
     model_path,
-    trust_remote_code=True,
-    max_num_seqs=8,
-    max_model_len=131072,
-    limit_mm_per_prompt={"image": 256}
+    torch_dtype=torch.float16,
+    device_map="auto",
+    trust_remote_code=True
 )
 processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
-sampling_params = SamplingParams(max_tokens=32768, temperature=0.8)
 
 def extract_thinking_and_summary(text: str, bot: str = "◁think▷", eot: str = "◁/think▷") -> tuple:
     if bot in text and eot not in text:
@@ -48,24 +46,32 @@ for i, image_path in enumerate(image_files, 1):
     # Create message
     messages = [
         {"role": "user", "content": [
-            {"type": "image", "image": ""}, 
+            {"type": "image", "image": image}, 
             {"type": "text", "text": "Convert this table to HTML table format."}
         ]}
     ]
     
-    # Generate
-    text = processor.apply_chat_template(messages, add_generation_prompt=True, return_tensors="pt")
-    outputs = llm.generate([{"prompt": text, "multi_modal_data": {"image": image}}], sampling_params=sampling_params)
-    generated_text = outputs[0].outputs[0].text
+    # Apply chat template
+    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    image_inputs, video_inputs = processor.process_vision_info(messages)
+    inputs = processor(text=[text], images=image_inputs, videos=video_inputs, padding=True, return_tensors="pt")
+    inputs = inputs.to("cuda")
     
-    thinking, summary = extract_thinking_and_summary(generated_text)
+    # Generate
+    with torch.no_grad():
+        generated_ids = model.generate(**inputs, max_new_tokens=4096, temperature=0.8, do_sample=True)
+    
+    generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, generated_ids)]
+    response = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    
+    thinking, summary = extract_thinking_and_summary(response)
     
     # Save the HTML output
     base_name = Path(image_path).stem
     output_path = f"{base_name}.html"
     
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write(summary if summary else generated_text)
+        f.write(summary if summary else response)
     
     print(f"Saved: {output_path}")
 

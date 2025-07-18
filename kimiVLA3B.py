@@ -26,14 +26,14 @@ def extract_thinking_and_summary(text: str, bot: str = "◁think▷", eot: str =
         return thinking, summary
     return "", text
 
-# Get all image files from table_samples folder
+# Get all image files from current directory
 image_files = []
 for ext in ['*.jpg', '*.jpeg', '*.png', '*.bmp', '*.gif', '*.tiff', '*.webp']:
-    image_files.extend(glob.glob(os.path.join('table_samples', ext)))
-    image_files.extend(glob.glob(os.path.join('table_samples', ext.upper())))
+    image_files.extend(glob.glob(ext))
+    image_files.extend(glob.glob(ext.upper()))
 
 if not image_files:
-    print("No image files found in 'table_samples' directory")
+    print("No image files found in current directory")
     exit()
 
 print(f"Found {len(image_files)} image files to process")
